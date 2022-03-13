@@ -1,9 +1,11 @@
 # About
 Base backend infrastructure to run my terraform deployment on github.
+As this is a personal stuff, all deployments are done by one role created in this terraform file.
 
-## Prerequiste
-
-- Have to prepare the Role to assume for running terraform manually (TODO: Separate this bootstrapping role and the actual assumed role on other deployments)
+## Not automated stuffs
+### AWS
+- Have to prepare the Role (assume_role_arn) to assume for running this terraform file manually. Requires heavy iam and s3 (and possibly dynamodb in the future?) permissions.
+- Have to prepare the Policy (terraform_operation_policy_arn) that does perform deployments to be attached to the GithubRole
 
 ## Description
 This repo's resources' tfstate is not controlled by the cloud backend itself. So don't forget to run 
