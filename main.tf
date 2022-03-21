@@ -16,6 +16,7 @@ terraform {
 variable "private" {
   description = "Just hidden not to expose on public repo"
   type        = object({
+    account                        = string
     assume_role_arn                = string
     infra_bucket_name              = string
     # Strings like "repo:naokiri/reponame:*"
@@ -44,10 +45,9 @@ resource "aws_iam_openid_connect_provider" "github_oidc" {
 }
 
 resource "aws_iam_role" "github_role" {
-  name                = "GithubRole"
-  description         = "Role to assume from github"
-  managed_policy_arns = var.private.terraform_operation_policy_arn
-  assume_role_policy  = jsonencode({
+  name               = "GithubRole"
+  description        = "Role to assume from github"
+  assume_role_policy = jsonencode({
     "Version" : "2012-10-17",
     "Statement" : [
       {
@@ -64,6 +64,54 @@ resource "aws_iam_role" "github_role" {
             "token.actions.githubusercontent.com:sub" : var.private.allowed_subs
           }
         }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "assume_terraform_github_deploy" {
+  name   = "AssumeGithubTerraformApplyRole"
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "Action" : "sts:AssumeRole",
+        "Resource" : aws_iam_role.terraform_github_apply_role.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "attatch_assume_github_terraform" {
+  role       = aws_iam_role.github_role.id
+  policy_arn = aws_iam_policy.assume_terraform_github_deploy.id
+}
+
+resource "aws_iam_role" "terraform_github_apply_role" {
+  name                = "TerraformGithubApplyRole"
+  description         = "Role to assume in github managed terraform files"
+  managed_policy_arns = var.private.terraform_operation_policy_arn
+  assume_role_policy  = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      # Principal to apply from local cli
+      {
+        "Effect" : "Allow",
+        "Principal" : {
+          "AWS" : format("arn:aws:iam::%s:user/cli", var.private.account)
+        },
+        "Action" : "sts:AssumeRole",
+        "Condition" : {}
+      },
+      # Principal to be used from github role
+      {
+        "Effect" : "Allow",
+        "Principal" : {
+          "AWS" : aws_iam_role.github_role.arn
+        },
+        "Action" : "sts:AssumeRole",
+        "Condition" : {}
       }
     ]
   })
